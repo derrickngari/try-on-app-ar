@@ -11,10 +11,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Minus, Plus, Trash2, ShoppingBag } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { useCart } from '@/contexts/CartContext';
+import { router } from 'expo-router';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function cart() {
   const insets = useSafeAreaInsets();
   const { cart, cartTotal, updateQuantity, removeFromCart } = useCart();
+  const { isAuthenticated } = useAuth();
+
+  const handleCheckout = () => {
+    if (isAuthenticated) {
+      router.push("/checkout")
+    } else {
+      router.push("/(auth)/sign-in")
+    }
+  }
 
   const handleIncrement = (productId: string, currentQuantity: number, selectedColor?: string, selectedMaterial?: string) => {
     updateQuantity(productId, currentQuantity + 1, selectedColor, selectedMaterial);
@@ -62,7 +73,7 @@ export default function cart() {
         showsVerticalScrollIndicator={false}
       >
         {cart.map((item, index) => (
-          <View key={`${item.product.id}-${item.selectedColor}-${item.selectedMaterial}-${index}`} style={styles.cartItem}>
+          <View key={`${item.product._id}-${item.selectedColor}-${item.selectedMaterial}-${index}`} style={styles.cartItem}>
             <Image
               source={{ uri: item.product.image }}
               style={styles.itemImage}
@@ -83,21 +94,21 @@ export default function cart() {
             <View style={styles.itemActions}>
               <TouchableOpacity
                 style={styles.removeButton}
-                onPress={() => handleRemove(item.product.id, item.selectedColor, item.selectedMaterial)}
+                onPress={() => handleRemove(item.product._id, item.selectedColor, item.selectedMaterial)}
               >
                 <Trash2 size={18} color={Colors.error} />
               </TouchableOpacity>
               <View style={styles.quantityContainer}>
                 <TouchableOpacity
                   style={styles.quantityButton}
-                  onPress={() => handleDecrement(item.product.id, item.quantity, item.selectedColor, item.selectedMaterial)}
+                  onPress={() => handleDecrement(item.product._id, item.quantity, item.selectedColor, item.selectedMaterial)}
                 >
                   <Minus size={16} color={Colors.text} />
                 </TouchableOpacity>
                 <Text style={styles.quantityText}>{item.quantity}</Text>
                 <TouchableOpacity
                   style={styles.quantityButton}
-                  onPress={() => handleIncrement(item.product.id, item.quantity, item.selectedColor, item.selectedMaterial)}
+                  onPress={() => handleIncrement(item.product._id, item.quantity, item.selectedColor, item.selectedMaterial)}
                 >
                   <Plus size={16} color={Colors.text} />
                 </TouchableOpacity>
@@ -122,7 +133,7 @@ export default function cart() {
             <Text style={styles.grandTotalValue}>Ksh {cartTotal.toLocaleString()}</Text>
           </View>
         </View>
-        <TouchableOpacity style={styles.checkoutButton}>
+        <TouchableOpacity style={styles.checkoutButton} onPress={handleCheckout}>
           <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
         </TouchableOpacity>
       </View>

@@ -23,7 +23,7 @@ export default function RootLayout() {
         <CartProvider>
           <GestureHandlerRootView style={{ flex: 1 }}>
             <StatusBar style="dark" />
-            <Slot />
+            <Slot initialRouteName="onboarding" />
           </GestureHandlerRootView>
         </CartProvider>
       </AuthProvider>

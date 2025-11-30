@@ -62,9 +62,11 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
       await saveUser(newUser);
       return newUser;
     },
+
     onSuccess: (newUser) => {
       setUser(newUser);
       setAuthToken(newUser?.accessToken);
+      console.log("Saving user credentials: ", newUser)
       queryClient.setQueryData(["auth-user"], newUser);
     },
   });
@@ -116,3 +118,5 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     authTokenRef,
   };
 });
+
+

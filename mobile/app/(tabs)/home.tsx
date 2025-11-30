@@ -226,7 +226,7 @@ export default function HomeScreen() {
   );
 }
 
-// Extracted for reuse
+
 const ProductCard = ({
   product,
   onPress,
