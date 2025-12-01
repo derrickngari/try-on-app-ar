@@ -2,16 +2,18 @@ function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function queryWithRetry(axiosCall, retries = 3) {
+async function queryWithRetry(axiosCall, retries = 3, delayMs = 2000) {
   let attempt = 0;
 
   while (attempt < retries) {
     try {
       return await axiosCall();
     } catch (err) {
-      if (err.response?.status === 429) {
-        console.warn(`Rate limit hit. Retrying in 3 seconds... (${attempt + 1}/${retries})`);
-        await delay(3000);
+      const status = err.response?.status;
+      if (status === 429 || status === 403) {        
+        const retryDelay = delayMs * Math.pow(2, attempt);
+        console.warn(`M-Pesa ${status} (Incapsula/RateLim). Retrying in ${retryDelay}s... (${attempt + 1}/${retries})`);
+        await delay(retryDelay);
         attempt++;
       } else {
         throw err;

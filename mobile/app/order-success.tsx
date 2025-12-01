@@ -8,25 +8,27 @@ import {
   SafeAreaView,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams } from 'expo-router';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { CheckCircle, ShoppingBag, FileText } from 'lucide-react-native';
 import Colors from '@/constants/colors';
 import { router } from 'expo-router';
 import { useCart } from '@/contexts/CartContext';
 
-interface OrderSuccessProps {
-  transactionId?: string;
-  total?: number;
-}
-
-export default function OrderSuccessScreen({ transactionId = 'MPESA123456789', total = 2500 }: OrderSuccessProps) {
+export default function OrderSuccessScreen() {
   const insets = useSafeAreaInsets();
   const { clearCart } = useCart();
   const cannonRef = useRef<ConfettiCannon>(null);
 
+  const { transactionId = 'N/A', total = 0 } = useLocalSearchParams<{
+    transactionId?: string;
+    total?: string;
+  }>();
+
+  const parsedTotal = Number(total);
+
   useEffect(() => {
     cannonRef.current?.start();
-    
     clearCart();
   }, [clearCart]);
 
@@ -52,12 +54,12 @@ export default function OrderSuccessScreen({ transactionId = 'MPESA123456789', t
         <View style={styles.summaryCard}>
           <Text style={styles.summaryTitle}>Order Details</Text>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Order ID:</Text>
-            <Text style={styles.summaryValue}>#{transactionId}</Text>
+            <Text style={styles.summaryLabel}>Transaction ID:</Text>
+            <Text style={styles.summaryValue}>{transactionId}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Total:</Text>
-            <Text style={styles.summaryValue}>Ksh {total.toLocaleString()}</Text>
+            <Text style={styles.summaryValue}>Ksh {parsedTotal.toLocaleString()}</Text>
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Payment:</Text>

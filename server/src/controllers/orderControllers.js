@@ -1,10 +1,16 @@
 const Order = require("../models/Order");
+const Payment = require("../models/Payment");
 const { genOrderNum } = require("../utils/genOrderNum");
 
 const createOrder = async (req, res) => {
   try {
-    const { items, total, paymentMethod, deliveryAddress } = req.body;
+    const { items, total, paymentMethod, deliveryAddress, paymentId, mpesaCode } = req.body;
     const userId = req.user.id;
+
+    if (paymentMethod === "M-Pesa" && (!paymentId || !mpesaCode)) {
+      return res.status(400).json({ message: "M-Pesa payment ID and code required", success: false });
+    }
+
     const orderId = genOrderNum("VIS");
 
     const order = new Order({
@@ -14,10 +20,20 @@ const createOrder = async (req, res) => {
       paymentMethod,
       deliveryAddress,
       orderNumber: orderId,
+      payment: {
+        method: paymentMethod,
+        transactionId: paymentId,
+        paidAt: new Date(),
+        mpesaCode: mpesaCode,
+      }
     });
-
     await order.save();
-    res.status(201).json({ message: "Order created", order });
+
+    if (paymentId) {
+      await Payment.findByIdAndUpdate(paymentId, { orderId: order._id, status: "Completed" });
+    }
+
+    res.status(201).json({ message: "Order created successfully", order });
   } catch (error) {
     res.status(500).json({ message: "Order creation failed", error });
   }

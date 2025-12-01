@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { Image } from "expo-image";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,6 +18,7 @@ import {
   User,
   ArrowLeft,
   Mail,
+  CheckCircle,
 } from "lucide-react-native";
 import Colors from "@/constants/colors";
 import { useCart } from "@/contexts/CartContext";
@@ -40,58 +42,170 @@ export default function CheckoutScreen() {
     city: "",
     county: "",
   });
+  const [paymentStatus, setPaymentStatus] = useState<
+    "idle" | "pending" | "success" | "failed"
+  >("idle");
+  const [checkoutRequestID, setCheckoutRequestID] = useState<string | null>(
+    null
+  );
+  const [paymentId, setPaymentId] = useState<string | null>(null);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const handleMpesaPayment = async () => {
     if (!isAuthenticated) {
-      Alert.alert("Sign In Required", "Please log in to complete purchase.", [
+      Alert.alert("Sign In Required", "Please log in.", [
         { text: "Cancel", style: "cancel" },
         { text: "Sign In", onPress: () => router.push("/(auth)/sign-in") },
       ]);
       return;
     }
 
+    if (!address.phone || !address.name) {
+      Alert.alert("Address Required", "Please fill name and phone.");
+      return;
+    }
+
     try {
+      setPaymentStatus("pending");
       const res = await api.post("/payments/mpesa/stk-push", {
         phoneNumber: address.phone,
         amount: Math.round(cartTotal),
-        accountReference: "VisaraOrder",
+        accountReference: `VisaraOrder_${Date.now()}`,
         transactionDesc: "Furniture Purchase",
       });
 
-      if (res.data.success) {
-
-        await api.post("/orders", {
-          items: cart.map((item) => ({
-            product: item.product._id,
-            quantity: item.quantity,
-            price: item.product.price,
-          })),
-          total: cartTotal,
-          paymentMethod: "M-Pesa",
-          deliveryAddress: address,
-        });
-
-        Alert.alert("Success!", "Order placed. Check your phone for PIN.", [
-          { text: "OK", onPress: () => router.push("/order-success") },
+      if (
+        res.data.success &&
+        res.data.paymentId &&
+        res.data.checkoutRequestID
+      ) {
+        setPaymentId(res.data.paymentId);
+        setCheckoutRequestID(res.data.checkoutRequestID);
+        Alert.alert("M-Pesa Sent!", "Check phone for PIN. Confirming...", [
+          { text: "OK" },
         ]);
+      } else {
+        console.log("Invalid STK Response:", res.data);
+        setPaymentStatus("failed");
+        Alert.alert("Payment Error", "Invalid response from M-Pesa.");
       }
-
-      Alert.alert("M-Pesa Push Sent!", "Check your phone for PIN prompt.", [
-        {
-          text: "OK",
-          onPress: () => {
-            setTimeout(() => {
-              clearCart();
-              router.push("/order-success");
-            }, 3000);
-          },
-        },
-      ]);
     } catch (error: any) {
+      console.log("STK Error:", error.response?.data || error.message);
+      setPaymentStatus("failed");
       Alert.alert(
         "Payment Error",
         error.response?.data?.message || "Try again."
       );
+    }
+  };
+
+  useEffect(() => {
+    if (!checkoutRequestID || !paymentId) return;
+
+    console.log("useEffect Polling Triggered:", {
+      checkoutRequestID,
+      paymentId,
+    });
+
+    let interval: ReturnType<typeof setInterval>;
+    let timeout: ReturnType<typeof setTimeout>;
+
+    interval = setInterval(async () => {
+      try {
+        console.log("Calling stkQuery...");
+        const res = await api.post("/payments/mpesa/stk-query", {
+          checkoutRequestID,
+        });
+
+        console.log("stkQuery Response:", res.data);
+
+        const { success, status, mpesaCode } = res.data;
+
+        if (!success) {
+          console.log("Query Failed (retry):", res.data.message || "Unknown");
+          return;
+        }
+
+        console.log("Polling Result:", { status, mpesaCode });
+        if (status === "Completed" && mpesaCode) {
+          console.log("COMPLETED! Creating Order...");
+          clearInterval(interval);
+          if (timeout) clearTimeout(timeout);
+
+          await createOrder(mpesaCode);
+          setPaymentStatus("success");
+          clearCart();
+
+          router.push({
+            pathname: "/order-success",
+            params: { transactionId: mpesaCode, total: cartTotal },
+          });
+          return;
+        }
+
+        if (status === "Failed") {
+          console.log("PAYMENT FAILED! Stopping.");
+          clearInterval(interval);
+          if (timeout) clearTimeout(timeout);
+          setPaymentStatus("failed");
+          Alert.alert("Payment Failed", res.data.message || "Try again.");
+        }
+      } catch (err: any) {
+        console.log("POLLING ERROR:", {
+          message: err.message,
+          status: err.response?.status,
+          data: err.response?.data,
+        });
+      }
+    }, 5000);
+
+    pollingRef.current = interval;
+    console.log("Interval Set (ID:", interval, ")");
+    timeout = setTimeout(() => {
+      console.log("Timeout! Stopping.");
+      clearInterval(interval);
+      pollingRef.current = null;
+      setPaymentStatus("failed");
+      Alert.alert(
+        "Timeout",
+        "Payment not confirmed. Check your M-Pesa messages."
+      );
+    }, 300000);
+
+    timeoutRef.current = timeout;
+
+    return () => {
+      console.log("Polling Cleanup");
+      clearInterval(interval);
+      if (timeout) clearTimeout(timeout);
+      pollingRef.current = null;
+      timeoutRef.current = null;
+    };
+  }, [checkoutRequestID, paymentId]);
+
+  const createOrder = async (mpesaCode: string) => {
+    try {
+      await api.post("/orders", {
+        items: cart.map((item) => ({
+          productId: item.product._id,
+          quantity: item.quantity,
+          priceAtOrder: item.product.price,
+        })),
+        totalAmount: cartTotal,
+        address,
+        payment: {
+          paymentId: mpesaCode, // Use mpesaCode as transaction ID
+          method: "M-Pesa",
+        },
+      });
+      console.log("Order created after payment success");
+    } catch (error: any) {
+      Alert.alert(
+        "Order Error",
+        "Payment OK, but order failed. Contact support."
+      );
+      console.error("Order creation error:", error);
     }
   };
 
@@ -109,12 +223,34 @@ export default function CheckoutScreen() {
   const steps = ["summary", "address", "payment"];
   const currentStepIndex = steps.indexOf(step);
 
+  if (paymentStatus === "success") {
+    return (
+      <View style={styles.successContainer}>
+        <CheckCircle size={80} color={Colors.success} />
+        <Text style={styles.successTitle}>Payment Successful!</Text>
+        <Text style={styles.successMessage}>Order confirmed. Thank you!</Text>
+        <TouchableOpacity
+          style={styles.successButton}
+          onPress={() => router.push("/(tabs)/home")}
+        >
+          <Text style={styles.successButtonText}>Continue Shopping</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <View style={[styles.header, { paddingTop: insets.top + 10 }]}>
         <TouchableOpacity onPress={handleBack} style={styles.backButton}>
           <ArrowLeft size={24} color={Colors.text} />
         </TouchableOpacity>
+        {paymentStatus === "pending" && (
+          <View style={styles.pollingIndicator}>
+            <ActivityIndicator size="small" color={Colors.primary} />
+            <Text style={styles.pollingText}>Confirming payment...</Text>
+          </View>
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
@@ -413,5 +549,51 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: Colors.border,
     marginHorizontal: 2,
+  },
+  successContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 24,
+    backgroundColor: Colors.background,
+  },
+  successTitle: {
+    fontSize: 28,
+    fontWeight: "700",
+    color: Colors.success,
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  successMessage: {
+    fontSize: 16,
+    color: Colors.textSecondary,
+    textAlign: "center",
+    marginBottom: 32,
+  },
+  successButton: {
+    backgroundColor: Colors.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 16,
+  },
+  successButtonText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFF",
+  },
+  pollingIndicator: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    backgroundColor: Colors.backgroundLight,
+    borderRadius: 20,
+    alignSelf: "center",
+  },
+  pollingText: {
+    fontSize: 14,
+    color: Colors.primary,
+    fontWeight: "500",
   },
 });

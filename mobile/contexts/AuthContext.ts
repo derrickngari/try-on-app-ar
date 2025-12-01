@@ -66,7 +66,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
     onSuccess: (newUser) => {
       setUser(newUser);
       setAuthToken(newUser?.accessToken);
-      console.log("Saving user credentials: ", newUser)
+      console.log("Saving user credentials: ");
       queryClient.setQueryData(["auth-user"], newUser);
     },
   });

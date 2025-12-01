@@ -178,7 +178,7 @@ export default function HomeScreen() {
             <View style={styles.promoContent}>
               <Text style={styles.promoTitle}>Black November Sale</Text>
               <Text style={styles.promoSubtitle}>20% off on Sofas</Text>
-              <TouchableOpacity style={styles.promoButton}>
+              <TouchableOpacity style={styles.promoButton} onPress={() => router.push("/(tabs)/catalog")}>
                 <Text style={styles.promoButtonText}>Shop Now</Text>
               </TouchableOpacity>
             </View>

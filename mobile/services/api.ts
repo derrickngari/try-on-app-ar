@@ -2,7 +2,7 @@ import Axios from 'axios';
 import { authTokenRef } from '@/contexts/AuthContext';
 
 export const api = Axios.create({
-  baseURL: 'https://feef51dcf521.ngrok-free.app/api',
+  baseURL: 'https://4fa23e6f16bb.ngrok-free.app/api',
   timeout: 10000,
 });
 

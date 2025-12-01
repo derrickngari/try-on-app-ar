@@ -1,74 +1,74 @@
 const mongoose = require("mongoose");
 
-const Payment = new mongoose.Schema(
-  {
-    userId: {
+const PaymentSchema = new mongoose.Schema({
+  userId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    ref: "User",
     required: true,
   },
-    amount: {
-      type: Number,
-      required: true,
-      validate: {
-        validator: function (v) {
-          return v > 0;
-        },
-        message: (props) =>
-          `Amount must be greater than zero. Received: ${props.value}`,
+  orderId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Order",
+  },
+  amount: {
+    type: Number,
+    required: true,
+    validate: {
+      validator: function (v) {
+        return v > 0;
       },
-    },
-    checkoutId: {
-      type: String,
-      unique: true,
-    },
-    mpesaCode: {
-      type: String,
-      unique: true,
-    },
-    transactionDate: {
-      type: String,
-    },
-    message: {
-      type: String,
-    },
-    phoneNumber: {
-      type: String,
-      required: true,
-      validate: {
-        validator: function (v) {
-          return /^254\d{9}$/.test(v);
-        },
-        message: (props) => `${props.value} is not a valid phone number!`,
-      },
-    },
-    status: {
-      type: String,
-      required: true,
-      enum: ["Pending", "Completed", "Failed"],
-      default: "Pending",
+      message: (props) => `Amount must be greater than zero. Received: ${props.value}`,
     },
   },
-  {
-    timestamps: true,
-  }
-);
-
-// Virtual field for a string representation of the transaction
-Payment.virtual("description").get(function () {
-  return `${this.mpesaCode} - ${(this.amount / 100).toFixed(2)} KES`;
+  checkoutId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  mpesaCode: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  transactionDate: {
+    type: String,
+  },
+  message: {
+    type: String,
+  },
+  phoneNumber: {
+    type: String,
+    required: true,
+    validate: {
+      validator: function (v) {
+        return /^254\d{9}$/.test(v);
+      },
+      message: (props) => `${props.value} is not a valid phone number!`,
+    },
+  },
+  status: {
+    type: String,
+    required: true,
+    enum: ["Pending", "Completed", "Failed"],
+    default: "Pending",
+  },
+}, {
+  timestamps: true,
 });
 
-Payment.index({ mpesaCode: 1, checkoutId: 1, phoneNumber: 1 });
+// indexes
+PaymentSchema.index({ userId: 1, status: 1 });
+PaymentSchema.index({ checkoutId: 1 });
+PaymentSchema.index({ mpesaCode: 1 });
 
-Payment.pre("save", function (next) {
-  console.log(`Transaction is being saved: ${this}`);
+PaymentSchema.pre("save", function (next) {
+  console.log(`Payment saving: ${this}`);
   next();
 });
 
-Payment.pre("findOneAndUpdate", function (next) {
-  console.log(`Transaction is being updated: ${this.getUpdate()}`);
+PaymentSchema.pre("findOneAndUpdate", function (next) {
+  console.log(`Payment updating: ${JSON.stringify(this.getUpdate())}`);
   next();
 });
 
-module.exports = mongoose.model("Payment", Payment);
+module.exports = mongoose.model("Payment", PaymentSchema);

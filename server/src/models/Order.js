@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 // Sub-schema for order items (snapshot to avoid price changes)
 const OrderItemSchema = new mongoose.Schema({
-  product: {
+  productId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: "Product",
     required: [true, "Product reference is required"],
@@ -51,15 +51,13 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       required: true,
       enum: {
-        values: ["Processing", "In-Transit", "Delivered", "Cancelled"], // Removed empty string
+        values: ["Processing", "In-Transit", "Delivered", "Cancelled"],
         message: "Status must be valid (Processing, In-Transit, Delivered, Cancelled)",
       },
       default: "Processing",
     },
-    addressId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Address",
-      required: [true, "Delivery address is required"],
+    address: {
+      type: Object,
     },
     payment: {
       method: {
@@ -70,10 +68,9 @@ const OrderSchema = new mongoose.Schema(
           message: "Invalid payment method",
         },
       },
-      transactionId: { type: String }, // M-Pesa receipt
+      paymentId: { type: String },
       paidAt: { type: Date },
     },
-    // Optional: Tracking info
     trackingNumber: { type: String },
     estimatedDelivery: { type: Date },
   },

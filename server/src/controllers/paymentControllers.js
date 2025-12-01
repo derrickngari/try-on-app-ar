@@ -10,23 +10,32 @@ const MPESA_BASE_URL =
 
 exports.sendStkPush = async (req, res) => {
   const token = req.token;
-  if (!token) throw new Error("Failed to get mpesas access token");
+  if (!token) {
+    return res.status(401).json({ message: "M-Pesa access token required", success: false });
+  }
 
   try {
     const { amount, phoneNumber, accountReference, transactionDesc } = req.body;
     const userId = req.user.id;
-    console.log("USer Id: ", userId);
     const formattedNumber = formatPhoneNumber(phoneNumber, "254");
 
-    const timestamp = new Date()
-      .toISOString()
-      .replace(/[^0-9]/g, "")
-      .slice(0, -3);
+    if (!amount || !phoneNumber || !accountReference || !transactionDesc) {
+      return res.status(400).json({ message: "Missing required fields", success: false });
+    }
+
+    const pendingPayment = await Payment.create({
+      userId,
+      amount,
+      phoneNumber: formattedNumber,
+      status: "Pending",
+      checkoutId: null,
+    });
+    console.log("Pending Payment Created:", pendingPayment._id);
+
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, -3);
     const password = Buffer.from(
       `${process.env.MPESA_BUSINESS_SHORTCODE}${process.env.MPESA_PASSKEY}${timestamp}`
     ).toString("base64");
-    // console.log("Mpesa passkey: ", process.env.MPESA_PASSKEY);
-    // console.log("Mpesa shortcode: ", process.env.MPESA_BUSINESS_SHORTCODE);
 
     const resp = await axios.post(
       `${MPESA_BASE_URL}/mpesa/stkpush/v1/processrequest`,
@@ -51,37 +60,34 @@ exports.sendStkPush = async (req, res) => {
       }
     );
 
-    const payment = await Payment.create({
-      userId,
-      checkoutId: null,
-      amount,
-      phoneNumber: formattedNumber,
-      status: "Pending",
-    });
-
-    // Handle the response from Safaricom
     if (resp.data.ResponseCode === "0") {
-      await Payment.findByIdAndUpdate(payment._id, {
+      await Payment.findByIdAndUpdate(pendingPayment._id, {
         checkoutId: resp.data.CheckoutRequestID,
         merchantRequestId: resp.data.MerchantRequestID,
       });
+
       return res.status(200).json({
-        message: "STK push request sent successfully.",
+        message: "STK push sent successfully",
+        success: true,
         checkoutRequestID: resp.data.CheckoutRequestID,
-        merchantRequestID: resp.data.MerchantRequestID,
-        responseDescription: resp.data.ResponseDescription,
-        paymentId: payment._id,
+        paymentId: pendingPayment._id,
       });
     } else {
+      await Payment.findByIdAndUpdate(pendingPayment._id, {
+        status: "Failed",
+        message: resp.data.ResponseDescription,
+      });
       return res.status(400).json({
-        error: "Failed to initiate STK push.",
-        responseDescription: resp.data.ResponseDescription,
+        message: "STK push failed",
+        success: false,
+        error: resp.data.ResponseDescription,
       });
     }
   } catch (error) {
-    console.log("Error sending STK Push: ", error.message);
+    console.error("STK Push Error:", error.message);
     return res.status(500).json({
-      message: "Failed to send STK Push request",
+      message: "Failed to send STK Push",
+      success: false,
       error: error.message,
     });
   }
@@ -106,8 +112,8 @@ exports.handleMpesaCallback = async (req, res) => {
     // find payment
     const payment = await Payment.findOne({ checkoutId: checkoutId });
     if (!payment) {
-      console.error("Payment not found for checkout:", checkoutId);
-      return res.status(200).json({ ResultCode: 0, ResultDesc: "OK" });
+      console.error("Payment not found for checkout: ", checkoutId);
+      return res.status(200).json({ ResultCode: 0, ResultDesc: "OK", statusCode: 200 });
     }
 
     // console.log("Callback Result Code:", resultCode);
@@ -162,7 +168,6 @@ exports.handleMpesaCallback = async (req, res) => {
     await Payment.findOneAndUpdate(
       { checkoutId },
       {
-        checkoutId,
         mpesaCode,
         status: "Completed",
         transactionDate: transDate,
@@ -172,15 +177,16 @@ exports.handleMpesaCallback = async (req, res) => {
     // sendOrderConfirmation(req.user?.email, newTransaction);
 
     res.status(200).json({
-      message: "M-Pesa Callback processed successfully",
-      transactionId: payment._id,
+      message: "M-Pesa updated successfully to Completed",
+      paymentId: payment._id,
+      checkoutRequestId: checkoutId,
+      mpesaCode,
       success: true,
     });
   } catch (error) {
     console.error("Error processing M-Pesa Callback:", error.message);
     console.error("Full error:", error);
 
-    // Still return 200 to M-Pesa (they retry if not)
     res.status(200).json({
       ResultCode: 0,
       ResultDesc: "Accepted (internal error handled)",
@@ -191,14 +197,14 @@ exports.handleMpesaCallback = async (req, res) => {
 exports.stkQuery = async (req, res) => {
   const { checkoutRequestID } = req.body;
   if (!checkoutRequestID) {
-    return res.status(400).json({ message: "Checkout Request ID is required" });
+    return res.status(400).json({ message: "Checkout Request ID is required", success: false });
   }
 
   const token = req.token;
   if (!token) {
     return res
       .status(500)
-      .json({ message: "Failed to get Mpesa access token" });
+      .json({ message: "Failed to get Mpesa access token", success: false });
   }
 
   try {
@@ -228,14 +234,20 @@ exports.stkQuery = async (req, res) => {
 
     if (resp.data.ResponseCode === "0") {
       console.log("Response data: ", JSON.stringify(resp.data, null, 2));
+      const payment = await Payment.findOne({ checkoutId: resp.data.CheckoutRequestID });
+
       return res.status(200).json({
         message: "STK Query successful",
+        success: true,
+        status: payment.status || "Unknown",
+        mpesaCode: payment.mpesaCode || null,
         response: resp.data,
       });
     } else {
       return res.status(400).json({
         message: "STK Query failed",
         response: resp.data,
+        success: false,
       });
     }
   } catch (error) {
