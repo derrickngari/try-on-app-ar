@@ -4,11 +4,22 @@ const { genOrderNum } = require("../utils/genOrderNum");
 
 const createOrder = async (req, res) => {
   try {
-    const { items, total, paymentMethod, deliveryAddress, paymentId, mpesaCode } = req.body;
+    const {
+      items,
+      totalAmount,
+      address,
+      payment,
+       } = req.body;
     const userId = req.user.id;
+    console.log("RECEIVED BODY: ", req.body);
 
-    if (paymentMethod === "M-Pesa" && (!paymentId || !mpesaCode)) {
-      return res.status(400).json({ message: "M-Pesa payment ID and code required", success: false });
+    if (payment?.method === "M-Pesa" && (!payment?.paymentId || !payment?.mpesaCode)) {
+      return res
+        .status(400)
+        .json({
+          message: "M-Pesa payment ID and code required",
+          success: false,
+        });
     }
 
     const orderId = genOrderNum("VIS");
@@ -16,21 +27,19 @@ const createOrder = async (req, res) => {
     const order = new Order({
       userId,
       items,
-      total,
-      paymentMethod,
-      deliveryAddress,
+      totalAmount,
+      address,
       orderNumber: orderId,
-      payment: {
-        method: paymentMethod,
-        transactionId: paymentId,
-        paidAt: new Date(),
-        mpesaCode: mpesaCode,
-      }
+      payment
     });
+
     await order.save();
 
-    if (paymentId) {
-      await Payment.findByIdAndUpdate(paymentId, { orderId: order._id, status: "Completed" });
+    if (payment?.paymentId) {
+      await Payment.findByIdAndUpdate(payment?.paymentId, {
+        orderId: order._id,
+        status: "Completed",
+      });
     }
 
     res.status(201).json({ message: "Order created successfully", order });
@@ -42,8 +51,9 @@ const createOrder = async (req, res) => {
 const getUserOrders = async (req, res) => {
   try {
     const userId = req.user.id;
+
+    console.log("Controller hiiit");
     const orders = await Order.find({ userId })
-      .populate('items.product', 'name image price')
       .sort({ createdAt: -1 });
     res.json({ orders });
   } catch (error) {
@@ -54,7 +64,10 @@ const getUserOrders = async (req, res) => {
 const getOrderById = async (req, res) => {
   try {
     const { id } = req.params;
-    const order = await Order.findById(id).populate('items.product', 'name image price');
+    const order = await Order.findById(id).populate(
+      "items.product",
+      "name image price"
+    );
     if (!order) return res.status(404).json({ message: "Order not found" });
     res.json({ order });
   } catch (error) {

@@ -70,12 +70,13 @@ const OrderSchema = new mongoose.Schema(
       },
       paymentId: { type: String },
       paidAt: { type: Date },
+      mpesaCode: { type: String}
     },
     trackingNumber: { type: String },
     estimatedDelivery: { type: Date },
   },
   {
-    timestamps: true, // createdAt, updatedAt auto-added
+    timestamps: true,
   }
 );
 
@@ -99,8 +100,8 @@ OrderSchema.pre('save', async function (next) {
 
     // Snapshot product details (prevent changes)
     for (let item of this.items) {
-      const product = await mongoose.model('Product').findById(item.product);
-      if (!product) return next(new Error(`Product ${item.product} not found`));
+      const product = await mongoose.model('Product').findById(item.productId);
+      if (!product) return next(new Error(`Product ${item.productId} not found`));
       item.productName = product.name;
       item.productImage = product.image;
       item.priceAtOrder = product.price; // Lock price at order time

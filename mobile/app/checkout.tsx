@@ -195,8 +195,9 @@ export default function CheckoutScreen() {
         totalAmount: cartTotal,
         address,
         payment: {
-          paymentId: mpesaCode, // Use mpesaCode as transaction ID
+          paymentId: paymentId,
           method: "M-Pesa",
+          mpesaCode: mpesaCode,
         },
       });
       console.log("Order created after payment success");

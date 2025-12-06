@@ -6,9 +6,9 @@ require("dotenv/config");
 const { connectDb } = require("./config/connectDb");
 
 const authRoutes = require("./routes/authRoutes");
-const productRoutes = require("./routes/productRoutes");
+const productRoutes = require("./routes/productRoutes");;
 const paymentRoutes = require("./routes/paymentRoutes");
-const orders = require("./routes/orderRoutes");
+const ordersRoutes = require("./routes/orderRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5001;
@@ -28,6 +28,6 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/payments", paymentRoutes);
-app.use("/api/orders", orders);
+app.use("/api/orders", ordersRoutes);
 
 app.listen(PORT, (req, res) => console.log(`Server running on port ${PORT}`));
