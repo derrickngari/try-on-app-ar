@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Heart, Share2, ShoppingCart, Cable, ArrowLeft } from 'lucide-react-native';
+import { Heart, Share2, ShoppingCart, ArrowLeft, Wand2 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import Colors from '@/constants/colors';
 import { api } from '@/services/api';
@@ -44,8 +44,8 @@ export default function ProductDetailScreen() {
         const res = await api.get(`/products/${id}`);
         const fetchedProduct = res.data.product;
         setProduct(fetchedProduct);
-        setSelectedColorId(fetchedProduct.colors[0]?.id || null);
-        setSelectedMaterialId(fetchedProduct.materials[0]?.id || null);
+        setSelectedColorId(fetchedProduct.colors?.[0]?.id || null);
+        setSelectedMaterialId(fetchedProduct.materials?.[0]?.id || null);
       } catch (err: any) {
         console.log("Product fetch error:", err.message);
         setError(true);
@@ -58,12 +58,12 @@ export default function ProductDetailScreen() {
   }, [id]);
 
   const selectedColor = useMemo(() =>
-    product?.colors.find((c) => c.id === selectedColorId),
+    product?.colors?.find((c) => c.id === selectedColorId),
     [product, selectedColorId]
   );
 
   const selectedMaterial = useMemo(() =>
-    product?.materials.find((m) => m.id === selectedMaterialId),
+    product?.materials?.find((m) => m.id === selectedMaterialId),
     [product, selectedMaterialId]
   );
 
@@ -120,7 +120,7 @@ export default function ProductDetailScreen() {
         {/* Hero Image */}
         <View style={styles.imageSection}>
           <Image
-            source={{ uri: product.images[selectedImageIndex] || product.image }}
+            source={{ uri: product.images?.[selectedImageIndex] || product.image }}
             style={styles.heroImage}
             contentFit="cover"
           />
@@ -145,7 +145,7 @@ export default function ProductDetailScreen() {
             </TouchableOpacity>
           </View>
 
-          {product.images.length > 1 && (
+          {product.images?.length > 1 && (
             <View style={styles.imageThumbnails}>
               {product.images.map((img, index) => (
                 <TouchableOpacity
@@ -165,7 +165,6 @@ export default function ProductDetailScreen() {
 
         {/* Content */}
         <View style={styles.contentSection}>
-          {/* ... rest of your content (unchanged) */}
           <View style={styles.titleSection}>
             <View>
               <Text style={styles.category}>{product.category}</Text>
@@ -190,11 +189,11 @@ export default function ProductDetailScreen() {
             <Text style={styles.description}>{product.description}</Text>
           </View>
 
-          {product.colors.length > 0 && (
+          {product.colors?.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Choose Color</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.colorsContainer}>
-                {product.colors.map((color) => (
+                {product.colors.filter(c => c && c.id).map((color) => (
                   <TouchableOpacity
                     key={color.id}
                     onPress={() => setSelectedColorId(color.id)}
@@ -213,11 +212,11 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
-          {product.materials.length > 0 && (
+          {product.materials?.length > 0 && (
             <View style={styles.section}>
               <Text style={styles.sectionTitle}>Choose Material</Text>
               <View style={styles.materialsContainer}>
-                {product.materials.map((material) => (
+                {product.materials.filter(m => m && m.id).map((material) => (
                   <TouchableOpacity
                     key={material.id}
                     onPress={() => setSelectedMaterialId(material.id)}
@@ -236,9 +235,13 @@ export default function ProductDetailScreen() {
             </View>
           )}
 
-          <TouchableOpacity style={styles.arButton} onPress={() => Alert.alert("AR", "Coming soon!")}>
-            <Cable size={20} color={Colors.primary} />
-            <Text style={styles.arButtonText}>View in AR</Text>
+          {/* VIRTUAL STAGING BUTTON */}
+          <TouchableOpacity
+            style={styles.arButton}
+            onPress={() => router.push(`/virtual-staging/${product._id}` as any)}
+          >
+            <Wand2 size={20} color={Colors.primary} />
+            <Text style={styles.arButtonText}>Try in Your Room (AI)</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -593,7 +596,5 @@ const styles = StyleSheet.create({
   },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 24 },
   loadingText: { marginTop: 16, fontSize: 16, color: Colors.textSecondary },
-  // errorText: { fontSize: 18, color: Colors.error, marginBottom: 16 },
-  // backButton: { padding: 12, backgroundColor: Colors.primary, borderRadius: 12 },
   backButtonText: { color: '#FFF', fontWeight: '600' },
 });

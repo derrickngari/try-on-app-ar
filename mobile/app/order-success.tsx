@@ -5,9 +5,9 @@ import {
   TouchableOpacity,
   StyleSheet,
   ScrollView,
-  SafeAreaView,
+
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useSafeAreaInsets, SafeAreaView } from 'react-native-safe-area-context';
 import { useLocalSearchParams } from 'expo-router';
 import ConfettiCannon from 'react-native-confetti-cannon';
 import { CheckCircle, ShoppingBag, FileText } from 'lucide-react-native';

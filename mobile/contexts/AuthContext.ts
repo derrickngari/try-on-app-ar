@@ -53,6 +53,9 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   useEffect(() => {
     if (userQuery.data !== undefined) {
       setUser(userQuery.data);
+      if (userQuery.data) {
+        setAuthToken(userQuery.data.accessToken);
+      }
     }
   }, [userQuery.data]);
 

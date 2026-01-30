@@ -55,4 +55,59 @@ const getById = async (req, res) => {
   }
 };
 
-module.exports = { getAllProducts, getById };
+const createProduct = async (req, res) => {
+  try {
+    const {
+      name,
+      price,
+      category,
+      description,
+      image,
+      images,
+      colors,
+      materials,
+      badge,
+    } = req.body;
+
+    if (!name || !price || !category || !description || !image) {
+      return res.status(400).json({
+        message: "Please provide all required fields",
+        success: false,
+      });
+    }
+
+    // Generate a simple ID if not provided (or use a library like uuid in production)
+    const id = name.toLowerCase().replace(/\s+/g, "-") + "-" + Date.now();
+
+    const newProduct = await Product.create({
+      id,
+      name,
+      price,
+      category,
+      description,
+      image,
+      images: images || [image],
+      colors: colors || [],
+      materials: materials || [],
+      badge,
+      rating: 0,
+      reviewCount: 0,
+    });
+
+    res.status(201).json({
+      message: "Product created successfully",
+      statusCode: 201,
+      success: true,
+      product: newProduct,
+    });
+  } catch (error) {
+    console.log("Error creating product:", error.message);
+    res.status(500).json({
+      message: "Internal Server Error",
+      statusCode: 500,
+      success: false,
+    });
+  }
+};
+
+module.exports = { getAllProducts, getById, createProduct };
